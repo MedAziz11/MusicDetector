@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from typing import ByteString
+from typing import ByteString, List, Mapping
 
 import requests
 
@@ -17,7 +17,7 @@ class Detector(object):
     def runRecord(self)-> ByteString:
         pass
 
-    def __getHeaders(self)->dict:
+    def __getHeaders(self)-> dict:
         headers = {
             'x-rapidapi-key': self.__KEY,
             'x-rapidapi-host': self.__HOST,
@@ -25,7 +25,7 @@ class Detector(object):
 
         return headers
 
-    def getSongDetails(self, key: str):
+    def getSongLyrics(self, key: str)-> List:
         endPoint = "songs/get-details"
         query = {"key": key, "locate": "en-US"}
         resp = requests.request(
@@ -34,9 +34,14 @@ class Detector(object):
             headers = self.__getHeaders(),
             params = query 
         )
-        return resp.json()
+        try:         
+            return resp.json()['sections'][1]['text']
+        except KeyError:
+            print('Cant find lyrics...')
 
-    def searchSong(self, song:str, limit = 5):
+    def searchSong(self, song:str, limit = 7)->Mapping:
+        #returns a Map of dicts {title, key, singer, img}
+        
         endPoint = "search"
         query = {"term": song, "locate": "en-US", "offset":"0","limit":limit}
         resp = requests.request(
@@ -47,13 +52,29 @@ class Detector(object):
         )
 
         json_resp = resp.json()
+
         #cleaning data
-        data =  map(lambda track:{'title': track['track']["title"],'key': track['track']["key"], 'singer': track['track']["subtitle"], 'img': track['track']["share"]["image"]} , json_resp["tracks"]["hits"])
+        try : 
+            data =  map(lambda track:{'title': track['track']["title"],'key': track['track']["key"], 'singer': track['track']["subtitle"], 'img': track['track']["share"]["image"]} , json_resp["tracks"]["hits"])
+            return data
+        except KeyError:
+            print("Sorry cant find the song...")
         
-        return data
+
+        
 
 if __name__ == "__main__":
     d = Detector()
-    #print(d.getSongDetails('40333609'))
-    for song in d.searchSong("ca fait des annees"):
-        print(f"{song['title']} By {song['singer']}")
+
+    try :
+    
+        for song in d.searchSong("Godzilla"):
+            print(f"{song['key']} : {song['title']} By {song['singer']}")
+
+            print(d.getSongLyrics(song['key']))
+            break
+
+    except: 
+        pass
+
+
