@@ -25,16 +25,16 @@ class Detector(object):
 
         return headers
 
-    def getSongDetails(self, song: str):
+    def getSongDetails(self, key: str):
         endPoint = "songs/get-details"
-        query = {"key": song, "locate": "en-US"}
+        query = {"key": key, "locate": "en-US"}
         resp = requests.request(
             "GET", 
             self.__URL+endPoint,
             headers = self.__getHeaders(),
             params = query 
         )
-        return resp.text
+        return resp.json()
 
     def searchSong(self, song:str, limit = 5):
         endPoint = "search"
@@ -46,9 +46,14 @@ class Detector(object):
             params = query
         )
 
-        return resp.text
+        json_resp = resp.json()
+        #cleaning data
+        data =  map(lambda track:{'title': track['track']["title"],'key': track['track']["key"], 'singer': track['track']["subtitle"], 'img': track['track']["share"]["image"]} , json_resp["tracks"]["hits"])
+        
+        return data
 
-
-d = Detector()
-#print(d.getSongDetails('40333609'))
-print(d.searchSong('clouds NF'))
+if __name__ == "__main__":
+    d = Detector()
+    #print(d.getSongDetails('40333609'))
+    for song in d.searchSong("ca fait des annees"):
+        print(f"{song['title']} By {song['singer']}")
