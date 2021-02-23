@@ -1,11 +1,12 @@
 import os
 from dotenv import load_dotenv
-from typing import ByteString, List, Mapping
+from typing import List, Mapping
 
 import requests
 import pyaudio
+import wave
 import base64
-from zlib import compress
+
 
 load_dotenv()
 class Detector(object):
@@ -26,6 +27,7 @@ class Detector(object):
         return headers
 
     def getSongLyrics(self, key: str)-> List:
+        #returns the lyrics of a specific key of a song
         endPoint = "songs/get-details"
         query = {"key": key, "locate": "en-US"}
         resp = requests.request(
@@ -40,7 +42,7 @@ class Detector(object):
             return{'error': 'Cant find lyrics...'}
 
     def searchSong(self, song:str, limit = 7)->Mapping:
-        #returns a Map of dicts {title, key, singer, img}
+        #Search a song by its title or singer returns a Map of dicts {title, key, singer, img}
         
         endPoint = "search"
         query = {"term": song, "locate": "en-US", "offset":"0","limit":limit}
@@ -63,57 +65,71 @@ class Detector(object):
 
     
     def runRecord(self):
-        chunk = 512 # Record in chunks of 1024 samples
+        #records an audio and return b64 coded str
+
+        chunk = 1024 # Record in chunks of 1024 samples
         sample_format = pyaudio.paInt16  # 16 bits per sample
         channels = 1
         fs = 44100  # Record at 44100 samples per second
-        seconds = 2
+        seconds = 5
 
         p = pyaudio.PyAudio()  # Create an interface to PortAudio
 
         print('Recording')
-
-        stream = p.open(format=sample_format,
-                        channels=channels,
-                        rate=fs,
-                        frames_per_buffer=chunk,
-                        input=True)
-
-        frames = []  # Initialize array to store frames
-
-        # Store data in chunks for 5 seconds
-        for i in range(0, int(fs / chunk * seconds)):
-            data = stream.read(chunk)
-            frames.append(data)
+        
+        #Opening the Stream and start Recording
+        stream = p.open(format=sample_format, channels=channels,rate=fs,frames_per_buffer=chunk,input=True )
+            
+        # Store data in chunks for 2 seconds
+        frames = [stream.read(chunk) for _ in range(0, int(fs / chunk * seconds))]  #frames Array
 
         # Stop and close the stream 
         stream.stop_stream()
         stream.close()
+
         # Terminate the PortAudio interface
         p.terminate()
 
         print('Finished recording')
 
+        #frames = compress(repr(frames).encode())
 
-        
-        encoded_string =compress(encoded_string)
-        return encoded_string 
-        
+        wf = wave.open("output.wav", 'wb')
+        wf.setnchannels(channels)
+        wf.setsampwidth(p.get_sample_size(sample_format))
+        wf.setframerate(fs)
+        wf.writeframes(b''.join(frames))
+        wf.close()
+
+        return base64.b64encode(open("output.wav" , 'rb').read())
 
 
 
-    def detectSong(self, frames:bytes):
+    def detectSong(self, frames):
+        #detect a song from an audio
         endPoint = "songs/detect"
         payload = frames
         resp = requests.request(
             "POST",
             self.__URL+endPoint,
             data = payload, 
-            headers = {'content-type': "application/xml" ,**self.__getHeaders()},
+            headers = {'content-type': "application/xml" , **self.__getHeaders()},
         )
 
         return resp.text
 
+
+    def searchByWords(self, phrase:str):
+        endPoint= "auto-complete"
+        query= {'term': phrase, "locale":"en-US"}
+        resp = requests.request(
+            "GET",
+            self.__URL+endPoint,
+            headers=self.__getHeaders(),
+            params=query
+        )
+
+        return resp.text
 
         
 
@@ -130,4 +146,5 @@ if __name__ == "__main__":
         # except: 
         #     pass
 
-    #print(d.detectSong(d.runRecord()))
+    print(d.detectSong(d.runRecord()))
+    #print(d.searchByWords("ones that we got"))
